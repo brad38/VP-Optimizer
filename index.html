@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VP Optimizer - Valorant</title>
+  
+  <!-- Carregando o Tailwind CSS direto do navegador -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Carregando o React para funcionar sem NPM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { background-color: #0f1923; color: #f3f4f6; }
+    /* Estilização da scrollbar para ficar com estilo gamer */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0f1923; }
+    ::-webkit-scrollbar-thumb { background: #ff4655; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // Ícones em SVG nativo para não precisar instalar bibliotecas
+    const Icons = {
+      Trophy: () => <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#ff4655]"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7c0 6 4 10 6 10s6-4 6-10V2z"/></svg>,
+      Coins: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>,
+      Target: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#ff4655] mr-2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+      Ticket: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 mr-1"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>,
+      Percent: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400 mr-1"><line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>,
+      AlertCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-500 mr-2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>,
+      ShoppingCart: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 mr-2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>,
+      ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="m9 18 6-6-6-6"/></svg>
+    };
+
+    const OFFICIAL_STORE = [
+      { vp: 475, price: 18.90 }, { vp: 1000, price: 38.90 }, { vp: 2050, price: 75.90 },
+      { vp: 3650, price: 132.90 }, { vp: 5350, price: 189.90 }, { vp: 11000, price: 379.90 },
+    ];
+
+    const RDC_STORE = [
+      { vp: 400, price: 16.00 }, { vp: 505, price: 20.00 }, { vp: 815, price: 32.00 },
+      { vp: 1305, price: 50.00 }, { vp: 1700, price: 64.00 }, { vp: 2720, price: 100.00 },
+      { vp: 3085, price: 113.00 }, { vp: 4450, price: 160.00 }, { vp: 4745, price: 170.00 },
+    ];
+
+    function App() {
+      const [currentVP, setCurrentVP] = useState('');
+      const [targetVP, setTargetVP] = useState('');
+      const [useTicket, setUseTicket] = useState(false);
+      const [useCashback, setUseCashback] = useState(true);
+
+      const formatCurrency = (value) => {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+      };
+
+      const calculation = useMemo(() => {
+        const current = parseInt(currentVP) || 0;
+        const target = parseInt(targetVP) || 0;
+        
+        if (target <= 0 || current >= target) return { missingVP: 0, official: null, rdc: null };
+
+        let missing = target - current;
+        if (useTicket) missing = Math.max(0, missing - 50);
+        if (missing <= 0) return { missingVP: 0, official: null, rdc: null };
+
+        const getCombos = (store, maxLen) => {
+          const results = [];
+          const helper = (currentCombo, startIndex) => {
+            if (currentCombo.length > 0) results.push([...currentCombo]);
+            if (currentCombo.length === maxLen) return;
+            for (let i = startIndex; i < store.length; i++) {
+              currentCombo.push(store[i]);
+              helper(currentCombo, i);
+              currentCombo.pop();
+            }
+          };
+          helper([], 0);
+          return results;
+        };
+
+        const evalCombo = (combo, isRdc, applyCb) => {
+          let sorted = [...combo].sort((a, b) => b.price - a.price);
+          let cost = 0, cb = 0, steps = [], totalVP = 0;
+
+          for (let item of sorted) {
+            totalVP += item.vp;
+            if (isRdc && applyCb) {
+              let paid = Math.max(0, item.price - cb);
+              let earned = paid * 0.05;
+              cost += paid;
+              steps.push({ ...item, discountUsed: cb, paid, cashbackEarned: earned });
+              cb = earned;
+            } else {
+              cost += item.price;
+              steps.push({ ...item, discountUsed: 0, paid: item.price, cashbackEarned: 0 });
+            }
+          }
+          return { items: sorted, totalVP, totalCost: cost, steps, finalCashback: cb };
+        };
+
+        const findBest = (store, isRdc, applyCb) => {
+          const combos = getCombos(store, 5);
+          let best = null;
+
+          for (let combo of combos) {
+            const evaled = evalCombo(combo, isRdc, applyCb);
+            if (evaled.totalVP >= missing) {
+              if (!best || evaled.totalCost < best.totalCost) best = evaled;
+              else if (evaled.totalCost === best.totalCost) {
+                if (evaled.totalVP > best.totalVP) best = evaled;
+                else if (evaled.totalVP === best.totalVP && evaled.items.length < best.items.length) best = evaled;
+              }
+            }
+          }
+          return best;
+        };
+
+        return {
+          missingVP: missing,
+          official: findBest(OFFICIAL_STORE, false, false),
+          rdc: findBest(RDC_STORE, true, useCashback)
+        };
+      }, [currentVP, targetVP, useTicket, useCashback]);
+
+      const { missingVP, official, rdc } = calculation;
+
+      let winner = null, savings = 0;
+      if (official && rdc) {
+        if (rdc.totalCost < official.totalCost) { winner = 'RDC'; savings = official.totalCost - rdc.totalCost; }
+        else if (official.totalCost < rdc.totalCost) { winner = 'OFFICIAL'; savings = rdc.totalCost - official.totalCost; }
+        else { winner = 'TIE'; }
+      }
+
+      return (
+        <div className="min-h-screen p-4 md:p-8 selection:bg-red-500/30 font-sans">
+          <div className="max-w-5xl mx-auto space-y-6">
+            
+            {/* Header */}
+            <header className="text-center space-y-2 mb-8">
+              <div className="inline-flex items-center justify-center p-3 bg-red-500/10 rounded-full mb-2 border border-red-500/30">
+                <Icons.Trophy />
+              </div>
+              <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase text-white">
+                VP <span className="text-[#ff4655]">Optimizer</span>
+              </h1>
+              <p className="text-gray-400 font-medium">Calcule a rota mais barata para a sua skin</p>
+            </header>
+
+            {/* Inputs */}
+            <div className="bg-[#1a2730] border border-gray-800 rounded-xl p-6 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-[#ff4655]"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <div className="space-y-2">
+                  <label className="flex items-center text-sm font-bold text-gray-300 uppercase tracking-wider">
+                    <Icons.Coins className="mr-2 text-yellow-400" /> VP que eu já tenho
+                  </label>
+                  <input
+                    type="number" min="0" value={currentVP} onChange={(e) => setCurrentVP(e.target.value)}
+                    placeholder="Ex: 250"
+                    className="w-full bg-[#0f1923] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#ff4655] focus:ring-1 focus:ring-[#ff4655] transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center text-sm font-bold text-gray-300 uppercase tracking-wider">
+                    <Icons.Target /> VP que a skin custa
+                  </label>
+                  <input
+                    type="number" min="0" value={targetVP} onChange={(e) => setTargetVP(e.target.value)}
+                    placeholder="Ex: 1775"
+                    className="w-full bg-[#0f1923] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#ff4655] focus:ring-1 focus:ring-[#ff4655] transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col sm:flex-row gap-4">
+                <label className="flex items-center space-x-3 cursor-pointer group">
+                  <div className="relative flex items-center justify-center">
+                    <input type="checkbox" className="peer sr-only" checked={useTicket} onChange={() => setUseTicket(!useTicket)} />
+                    <div className="w-5 h-5 border-2 border-gray-600 rounded bg-[#0f1923] peer-checked:bg-[#ff4655] peer-checked:border-[#ff4655] transition-all"></div>
+                  </div>
+                  <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors flex items-center">
+                    <Icons.Ticket /> Descontar 50 VP (Ticket Riot)
+                  </span>
+                </label>
+
+                <label className="flex items-center space-x-3 cursor-pointer group">
+                  <div className="relative flex items-center justify-center">
+                    <input type="checkbox" className="peer sr-only" checked={useCashback} onChange={() => setUseCashback(!useCashback)} />
+                    <div className="w-5 h-5 border-2 border-gray-600 rounded bg-[#0f1923] peer-checked:bg-[#ff4655] peer-checked:border-[#ff4655] transition-all"></div>
+                  </div>
+                  <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors flex items-center">
+                    <Icons.Percent /> Aplicar Cashback (RDC)
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Results */}
+            {parseInt(targetVP) > 0 && parseInt(currentVP) >= parseInt(targetVP) ? (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 text-center">
+                <p className="text-green-400 font-bold text-lg">Você já tem VP suficiente para esta skin! 🎉</p>
+              </div>
+            ) : missingVP > 0 && official && rdc ? (
+              <div className="space-y-6">
+                
+                <div className="bg-gray-800/50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between border border-gray-700">
+                  <div className="flex items-center space-x-2">
+                    <Icons.AlertCircle />
+                    <span className="text-lg">Você precisa de <strong className="text-white">{missingVP} VP</strong></span>
+                  </div>
+                  {savings > 0 && (
+                    <div className="mt-2 sm:mt-0 text-sm font-bold px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">
+                      Economia máxima de {formatCurrency(savings)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Loja Oficial */}
+                  <div className={`relative bg-[#1a2730] border-2 rounded-xl p-6 transition-all ${winner === 'OFFICIAL' || winner === 'TIE' ? 'border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.15)]' : 'border-gray-800'}`}>
+                    {winner === 'OFFICIAL' && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full">Mais Barato</div>}
+                    
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-4 mb-4">
+                      <h3 className="text-xl font-bold text-white flex items-center">Loja Oficial</h3>
+                      <div className="text-right">
+                        <p className="text-2xl font-black text-white">{formatCurrency(official.totalCost)}</p>
+                        <p className="text-sm text-gray-400">Entrega {official.totalVP} VP</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Pacotes a comprar:</p>
+                      {official.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-[#0f1923] p-3 rounded-lg border border-gray-800">
+                          <div className="flex items-center">
+                            <Icons.ShoppingCart />
+                            <span className="font-semibold text-gray-200">{item.vp} VP</span>
+                          </div>
+                          <span className="text-gray-400">{formatCurrency(item.price)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* RDC */}
+                  <div className={`relative bg-[#1a2730] border-2 rounded-xl p-6 transition-all ${winner === 'RDC' || winner === 'TIE' ? 'border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.15)]' : 'border-gray-800'}`}>
+                    {winner === 'RDC' && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full">Mais Barato</div>}
+                    
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-4 mb-4">
+                      <h3 className="text-xl font-bold text-white flex items-center">Rei dos Coins</h3>
+                      <div className="text-right">
+                        <p className="text-2xl font-black text-white">{formatCurrency(rdc.totalCost)}</p>
+                        <p className="text-sm text-gray-400">Entrega {rdc.totalVP} VP</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                        {useCashback ? 'Passo a Passo (Usando Cashback):' : 'Pacotes a comprar:'}
+                      </p>
+                      
+                      <div className="space-y-2 relative">
+                        {useCashback && rdc.steps.length > 1 && <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-gray-800 z-0"></div>}
+                        
+                        {rdc.steps.map((step, idx) => (
+                          <div key={idx} className="relative z-10 flex gap-3">
+                            {useCashback && (
+                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#0f1923] border border-[#ff4655] text-[#ff4655] flex items-center justify-center font-bold text-sm">
+                                {idx + 1}
+                              </div>
+                            )}
+                            <div className="flex-1 bg-[#0f1923] p-3 rounded-lg border border-gray-800">
+                              <div className="flex justify-between items-start mb-1">
+                                <span className="font-bold text-gray-200">{step.vp} VP</span>
+                                <span className="text-white font-semibold">{formatCurrency(step.paid)}</span>
+                              </div>
+                              
+                              {useCashback && (
+                                <div className="text-xs space-y-1">
+                                  {step.discountUsed > 0 && (
+                                    <p className="text-green-400 flex items-center"><Icons.ChevronRight /> Usou {formatCurrency(step.discountUsed)} de saldo</p>
+                                  )}
+                                  <p className="text-gray-400 flex items-center"><Icons.ChevronRight /> Gera {formatCurrency(step.cashbackEarned)} p/ o próximo</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {useCashback && rdc.finalCashback > 0 && (
+                        <div className="mt-4 p-3 bg-[#ff4655]/10 border border-[#ff4655]/20 rounded-lg text-sm text-[#ff4655] flex items-center">
+                          <Icons.Coins className="mr-2" />
+                          Sobrará {formatCurrency(rdc.finalCashback)} de saldo no site!
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
