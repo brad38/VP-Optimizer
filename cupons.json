@@ -55,6 +55,114 @@
       "value": 5,
       "confidence": "média",
       "method": "pelando-scraper"
+    },
+    {
+      "code": "10%\nOFF",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "26%\nOFF",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "5%\nOFF",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "CAPCOM",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "CAPCOM10",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "CODE",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "CUPOM-RITOGOMES",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "DESTAQUES-MVP",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "DEZCONTO",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "ENVIAR",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "FOIDEF",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "GAMEPASS12",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "GAMEPASS5",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "NEWSLETTER",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "NINTENDO",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "NUUVEM",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "TRUE",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "VALUE",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
     }
   ],
   "rdc": [
@@ -71,6 +179,36 @@
       "value": 3,
       "confidence": "baixa",
       "method": null
+    },
+    {
+      "code": "CÓDIGO",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "EMPREGO",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "RIICK",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "TECNOSH",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "TIBIAPAPO",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
     }
   ],
   "bonoxs": [
@@ -94,6 +232,72 @@
       "value": 5,
       "confidence": "média",
       "method": null
+    },
+    {
+      "code": "COBRISMO",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "CÓDIGO",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "EUJEGUE5",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "MYLON",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "NUUH",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "NUUHVCT",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "PIZAOFF",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "SHOOTNOW",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "SWAN",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "TIXINHA5",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
+    },
+    {
+      "code": "VOLTAFERIAS",
+      "desc": "Bot Multi-site",
+      "value": 5,
+      "confidence": "alta"
     }
   ],
   "official": []
