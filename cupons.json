@@ -1,0 +1,20 @@
+{
+  "nuuvem": [
+    { "code": "PIX", "desc": "15% OFF pagando no PIX", "value": 15, "confidence": "alta", "method": "PIX" },
+    { "code": "A10", "desc": "10% OFF em jogos do catálogo", "value": 10, "confidence": "alta", "method": null },
+    { "code": "EN8", "desc": "8% OFF geral (Thiago Rodrigo)", "value": 8, "confidence": "alta", "method": null },
+    { "code": "DO8", "desc": "8% OFF de desconto extra", "value": 8, "confidence": "alta", "method": null },
+    { "code": "MES", "desc": "4% OFF em Gift Cards da Riot Games", "value": 4, "confidence": "alta", "method": "PIX" },
+    { "code": "PROMOBIT10", "desc": "10% OFF em mais de 1000 jogos", "value": 10, "confidence": "média", "method": null }
+  ],
+  "rdc": [
+    { "code": "JOAOSHIRA", "desc": "Desconto de parceiro (João Shira)", "value": 3, "confidence": "média", "method": null },
+    { "code": "STORMING", "desc": "Desconto de criador de conteúdo", "value": 3, "confidence": "baixa", "method": null }
+  ],
+  "bonoxs": [
+    { "code": "PORTAL6", "desc": "Desconto de parceiro (Portal R6M)", "value": 5, "confidence": "alta", "method": null },
+    { "code": "MAUZAO5", "desc": "Desconto de afiliado (Mauzao)", "value": 5, "confidence": "média", "method": null },
+    { "code": "GARZABZ5", "desc": "Desconto de afiliado (GarzaBz)", "value": 5, "confidence": "média", "method": null }
+  ],
+  "official": []
+}

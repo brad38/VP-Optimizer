@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VP Optimizer - Valorant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { background-color: #080d12; color: #e8eaed; font-family: 'Inter', sans-serif; }
+    h1, h2, h3, .rajdhani { font-family: 'Rajdhani', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f1923; }
+    ::-webkit-scrollbar-thumb { background: #ff4655; border-radius: 3px; }
+    .tab-active { background: linear-gradient(135deg, #ff4655 0%, #c93040 100%); color: #fff; }
+    .tab-inactive { background: #111b24; color: #8a9bb0; }
+    .tab-inactive:hover { background: #1a2a38; color: #c0cdd9; }
+    .card { background: #0f1923; border: 1px solid #1e2d3d; border-radius: 12px; }
+    .card-winner-cheap { box-shadow: 0 0 24px rgba(34,197,94,0.12); border-color: #22c55e40 !important; }
+    .card-winner-vp    { box-shadow: 0 0 24px rgba(27,207,160,0.12); border-color: #1bcfa040 !important; }
+    input[type=range] { -webkit-appearance: none; width: 100%; height: 6px; background: #1e2d3d; border-radius: 3px; outline: none; }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+      background: #ff4655; cursor: pointer; border: 3px solid #080d12;
+      box-shadow: 0 0 8px rgba(255,70,85,0.5);
+    }
+    .winner-badge {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+      padding: 3px 12px; border-radius: 99px; font-family: 'Rajdhani', sans-serif; white-space: nowrap;
+    }
+    .site-pill {
+      display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+      font-family: 'Rajdhani', sans-serif; text-transform: uppercase;
+    }
+    .glow-red { text-shadow: 0 0 20px rgba(255,70,85,0.4); }
+    .shine { position: relative; }
+    .shine-inner { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 0; }
+    .shine-inner::after {
+      content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+      animation: shine 3.5s infinite;
+    }
+    @keyframes shine { 0%{left:-100%} 60%,100%{left:200%} }
+    .fade-in { animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+    .step-line { position: absolute; left: 13px; top: 28px; bottom: 0; width: 1px; background: #1e2d3d; }
+    .coupon-row { transition: background 0.12s; border-radius: 8px; }
+    .coupon-row:hover { background: #111b24; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .btn-open-site {
+      display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+      border-radius: 8px; font-size: 11px; font-weight: 600;
+      font-family: 'Rajdhani', sans-serif; text-transform: uppercase;
+      transition: all 0.15s; cursor: pointer; text-decoration: none; letter-spacing: 0.04em;
+    }
+    .btn-open-site:hover { opacity: 0.8; transform: translateY(-1px); }
+    .progress-bar { height: 3px; border-radius: 99px; background: #1e2d3d; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 99px; transition: width 0.2s ease; }
+    .tooltip-icon { width: 14px; height: 14px; border-radius: 99px; background: #1e2d3d;
+      border: 1px solid #2a3d4f; color: #4a6070; font-size: 9px; font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: help; margin-left: 4px; flex-shrink: 0; font-family: 'Inter', sans-serif; }
+      
+    /* Esconde as setas de spinner no input do Orçamento */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; margin: 0; 
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useMemo, useEffect, useReducer } = React;
+
+    /* ═══ DADOS E LOJAS ═══════════════════════════════════════ */
+    const OFFICIAL_STORE = [
+      { vp:475, price:18.90 }, { vp:1000, price:38.90 }, { vp:2050, price:75.90 },
+      { vp:3650, price:132.90 }, { vp:5350, price:189.90 }, { vp:11000, price:379.90 },
+    ];
+    const NUUVEM_STORE = [
+      { vp:400, bonus:0, price:16.00 }, { vp:805, bonus:10, price:32.00 },
+      { vp:1610, bonus:90, price:64.00 }, { vp:2840, bonus:245, price:113.00 },
+      { vp:4020, bonus:430, price:160.00 }, { vp:8040, bonus:1145, price:320.00 },
+    ];
+    const FALLBACK_RDC = [
+      { vp:400, price:16.00, cashback:0.050 }, { vp:505, price:20.00, cashback:0.045 },
+      { vp:815, price:32.00, cashback:0.050 }, { vp:1305, price:50.00, cashback:0.045 },
+      { vp:1700, price:64.00, cashback:0.050 }, { vp:2720, price:100.00, cashback:0.045 },
+      { vp:3085, price:113.00, cashback:0.050 }, { vp:4450, price:160.00, cashback:0.050 },
+      { vp:4745, price:170.00, cashback:0.040 }, { vp:9185, price:320.00, cashback:0.050 },
+    ];
+    const BONOXS_STORE = [
+      { vp:400, price:16.00 }, { vp:505, price:20.00 },
+      { vp:815, price:32.00 }, { vp:1305, price:50.00 },
+      { vp:1700, price:64.00 }, { vp:2720, price:100.00 },
+      { vp:3085, price:113.00 }, { vp:4450, price:160.00 },
+      { vp:4745, price:170.00 }, { vp:9185, price:320.00 },
+    ];
+
+    const SITES = {
+      official: { label:'Loja Oficial',  color:'#4fa3e0', tag:'RIOT',   url:null,                                               store:OFFICIAL_STORE },
+      nuuvem:   { label:'Nuuvem',        color:'#1bcfa0', tag:'NUUVEM', url:'https://www.nuuvem.com/lp/pt/valorant-points/',    store:NUUVEM_STORE   },
+      rdc:      { label:'Rei dos Coins', color:'#f5a623', tag:'RDC',    url:'https://www.reidoscoins.com.br/Valorant',          store:null           },
+      bonoxs:   { label:'Bonoxs',        color:'#a855f7', tag:'BONOXS', url:'https://bonoxs.com/br?from=header',                store:BONOXS_STORE   },
+    };
+
+    /* ═══ FETCH RDC ═══════════════════════════════════════════ */
+    const CORS_PROXIES = [
+      (u) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+      (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    ];
+    const parseRdcHtml = (html) => {
+      const text = new DOMParser().parseFromString(html,'text/html').body.textContent||'';
+      const re = /Valorant\s+(\d[\d.]*)\s+VPoints[\s\S]{0,300}?R\$\s*(\d+(?:[.,]\d{2})?)[\s\S]{0,200}?([\d]+(?:[.,]\d+)?)\s*%\s*de\s*Cashback/gi;
+      const map = new Map();
+      for (const m of text.matchAll(re)) {
+        const vp=parseInt(m[1].replace('.',''));
+        const price=parseFloat(m[2].replace('.','').replace(',','.'));
+        const cashback=parseFloat(m[3].replace(',','.'))/100;
+        if(vp>0&&price>0&&!isNaN(cashback)) map.set(vp,{vp,price,cashback});
+      }
+      return [...map.values()].sort((a,b)=>a.vp-b.vp);
+    };
+    const RDC_CACHE_KEY = 'vp_optimizer_rdc_cache';
+    function loadCachedRdc(){
+      try{
+        const raw=localStorage.getItem(RDC_CACHE_KEY);
+        if(!raw) return null;
+        const {data,ts}=JSON.parse(raw);
+        if(Array.isArray(data)&&data.length>0) return data;
+      }catch(e){}
+      return null;
+    }
+    function saveCachedRdc(data){
+      try{ localStorage.setItem(RDC_CACHE_KEY,JSON.stringify({data,ts:Date.now()})); }catch(e){}
+    }
+
+    async function fetchRdc() {
+      for (let i=0;i<CORS_PROXIES.length;i++) {
+        try {
+          const r=await fetch(CORS_PROXIES[i]('https://www.reidoscoins.com.br/Valorant'),{signal:AbortSignal.timeout(8000)});
+          if(!r.ok) continue;
+          const html=i===0?(await r.json()).contents:await r.text();
+          if(!html) continue;
+          const parsed=parseRdcHtml(html);
+          if(parsed.length>0){
+            saveCachedRdc(parsed);
+            return{data:parsed,source:'live'};
+          }
+        } catch(e) { console.warn(`Proxy ${i}:`,e.message); }
+      }
+      const cached=loadCachedRdc();
+      if(cached) return{data:cached,source:'cache'};
+      return{data:FALLBACK_RDC,source:'fallback'};
+    }
+
+    /* ═══ HELPERS ═════════════════════════════════════════════ */
+    const fmt  = (v) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);
+    const fmtN = (v) => new Intl.NumberFormat('pt-BR').format(v);
+
+    function getCombos(store,maxLen=4){
+      const res=[];
+      const h=(c,s)=>{
+        if(c.length>0)res.push([...c]);
+        if(c.length===maxLen)return;
+        for(let i=s;i<store.length;i++){c.push(store[i]);h(c,i);c.pop();}
+      };
+      h([],0); return res;
+    }
+    function evalCombo(combo,isRdc,applyCb,cpPct=0){
+      const sorted=[...combo].sort((a,b)=>b.price-a.price);
+      let cost=0, originalTotalCost=0, cb=0, steps=[],totalVP=0;
+      
+      for(const item of sorted){
+        const tvp=item.vp+(item.bonus||0); totalVP+=tvp;
+        originalTotalCost += item.price;
+        
+        if(isRdc&&applyCb){
+          const paid=Math.max(0,item.price-cb)*(1-cpPct/100);
+          const earned=paid*(item.cashback||0);
+          cost+=paid; 
+          steps.push({...item,totalVpNow:tvp,discountUsed:cb,paid,originalPrice:item.price,cashbackEarned:earned}); 
+          cb=earned;
+        } else {
+          const paid=item.price*(1-cpPct/100);
+          cost+=paid; 
+          steps.push({...item,totalVpNow:tvp,discountUsed:0,paid,originalPrice:item.price,cashbackEarned:0}); 
+          cb=0;
+        }
+      }
+      return{items:sorted,totalVP,totalCost:cost,originalCost:originalTotalCost,steps,finalCashback:cb};
+    }
+    function findBestFor(store,need,isRdc=false,applyCb=false,cpPct=0){
+      if(!store||!store.length)return null;
+      let best=null;
+      for(const c of getCombos(store,4)){
+        const ev=evalCombo(c,isRdc,applyCb,cpPct);
+        if(ev.totalVP>=need&&(!best||ev.totalCost<best.totalCost||(ev.totalCost===best.totalCost&&ev.totalVP>best.totalVP)))best=ev;
+      }
+      return best;
+    }
+    function findMaxVPFor(store,budget,isRdc=false,applyCb=false,cpPct=0){
+      if(!store||!store.length)return null;
+      let best=null;
+      for(const c of getCombos(store,4)){
+        const ev=evalCombo(c,isRdc,applyCb,cpPct);
+        if(ev.totalCost<=budget+0.001&&(!best||ev.totalVP>best.totalVP||(ev.totalVP===best.totalVP&&ev.totalCost<best.totalCost)))best=ev;
+      }
+      return best;
+    }
+
+    /* ═══ ÍCONES ══════════════════════════════════════════════ */
+    const Ico={
+      Trophy:   ()=><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7c0 6 4 10 6 10s6-4 6-10V2z"/></svg>,
+      Coin:     ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>,
+      Target:   ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+      Tag:      ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8-8a1 1 0 0 0 0-1.42Z"/><circle cx="7" cy="7" r="1"/></svg>,
+      Search:   ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
+      Refresh:  ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>,
+      Check:    ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+      X:        ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+      Info:     ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+      External: ()=><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+      Zap:      ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+      Sparkle:  ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>,
+      Calculator: ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="8" y1="18" x2="16" y2="18"/></svg>,
+      ChevronDown: ()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
+      ChevronUp: ()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>,
+    };
+
+    /* ═══ TOOLTIP ═════════════════════════════════════════════ */
+    function Tooltip({text}){
+      const [pos,setPos]=useState(null);
+      const ref=React.useRef(null);
+      const show=()=>{
+        if(!ref.current)return;
+        const r=ref.current.getBoundingClientRect();
+        const x=Math.min(Math.max(r.left+r.width/2,126),window.innerWidth-126);
+        setPos({x,y:r.top});
+      };
+      const hide=()=>setPos(null);
+      return(
+        <span ref={ref} className="tooltip-icon" onMouseEnter={show} onMouseLeave={hide} onClick={e=>e.preventDefault()}>?
+          {pos&&ReactDOM.createPortal(
+            <div style={{
+              position:'fixed',bottom:`${window.innerHeight-pos.y+10}px`,left:`${pos.x}px`,
+              transform:'translateX(-50%)',background:'#111b24',border:'1px solid #2a3d4f',
+              borderRadius:10,padding:'10px 13px',width:240,fontSize:12,color:'#c0cdd9',
+              lineHeight:1.5,zIndex:99999,pointerEvents:'none',
+              boxShadow:'0 8px 24px rgba(0,0,0,0.5)',fontFamily:'Inter',fontWeight:400,
+            }}>
+              {text}
+              <div style={{position:'absolute',top:'100%',left:'50%',transform:'translateX(-50%)',
+                border:'6px solid transparent',borderTopColor:'#2a3d4f'}}/>
+            </div>,
+            document.body
+          )}
+        </span>
+      );
+    }
+
+    /* ═══ CHECKBOX ════════════════════════════════════════════ */
+    function Checkbox({checked,onChange,label,tooltip}){
+      return(
+        <label className="flex items-center gap-2 cursor-pointer group select-none">
+          <div className="relative w-4 h-4 flex-shrink-0">
+            <input type="checkbox" className="sr-only" checked={checked} onChange={onChange}/>
+            <div className="w-4 h-4 border-2 rounded transition-all flex items-center justify-center"
+                 style={{borderColor:checked?'#ff4655':'#2a3d4f',background:checked?'#ff4655':'#080d12'}}>
+              {checked&&<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><polyline points="1 4 4 7 9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            </div>
+          </div>
+          <span className="text-xs text-gray-400 group-hover:text-gray-200 transition-colors">{label}</span>
+          {tooltip&&<Tooltip text={tooltip}/>}
+        </label>
+      );
+    }
+
+    /* ═══ CARD RESULTADO CALCULAR VP ═════════════════════════ */
+    function SiteResultCard({siteKey,result,isWinner,useCashback,couponPct}){
+      const site=SITES[siteKey];
+      const isRdc=siteKey==='rdc';
+      const applyCb=isRdc&&useCashback;
+      if(!result)return(
+        <div className="card p-5 text-center">
+          <div className="site-pill mb-2" style={{background:site.color+'22',color:site.color,border:`1px solid ${site.color}44`}}>{site.tag}</div>
+          <p className="text-gray-600 text-sm mt-1">Sem dados disponíveis</p>
+        </div>
+      );
+      return(
+        <div className={`card p-5 relative fade-in ${isWinner?'card-winner-cheap':''}`}>
+          {isWinner&&<div className="winner-badge" style={{background:`linear-gradient(135deg,#22c55e,#16a34a)`,color:'#fff'}}>✓ Mais Barato</div>}
+          <div className="flex items-center justify-between mb-3 pb-3" style={{borderBottom:'1px solid #1e2d3d'}}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="site-pill" style={{background:site.color+'22',color:site.color,border:`1px solid ${site.color}44`}}>{site.tag}</span>
+              <span className="rajdhani font-bold text-white text-lg leading-none">{site.label}</span>
+            </div>
+            {site.url&&(
+              <a href={site.url} target="_blank" rel="noopener noreferrer" className="btn-open-site"
+                 style={{background:site.color+'18',color:site.color,border:`1px solid ${site.color}40`}}>
+                <Ico.External/> Abrir site
+              </a>
+            )}
+          </div>
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-gray-500 text-xs">Total a pagar</span>
+            <div className="text-right flex items-center justify-end gap-2">
+              {couponPct>0&&result.originalCost>result.totalCost&&(
+                 <span className="line-through text-gray-500 text-lg">{fmt(result.originalCost)}</span>
+              )}
+              <div className="rajdhani font-black text-2xl text-white">{fmt(result.totalCost)}</div>
+            </div>
+          </div>
+          <div className="text-right text-xs text-gray-500 mb-3">Entrega <span className="text-gray-300 font-bold">{fmtN(result.totalVP)} VP</span></div>
+          
+          {couponPct>0&&(
+            <div className="mb-3 p-2 rounded-lg text-xs flex items-center gap-1.5"
+                 style={{background:'#1bcfa012',border:'1px solid #1bcfa030',color:'#1bcfa0'}}>
+              <Ico.Tag/> Cupom {couponPct}% aplicado
+            </div>
+          )}
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
+              {applyCb?'Passo a passo (com cashback)':'Pacotes a comprar'}
+            </p>
+            <div className="space-y-1.5 relative">
+              {applyCb&&result.steps.length>1&&<div className="step-line"/>}
+              {result.steps.map((s,idx)=>(
+                <div key={idx} className="relative flex gap-2 z-10">
+                  {applyCb&&(
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs rajdhani"
+                         style={{background:'#ff465518',border:'1px solid #ff455540',color:'#ff4655'}}>{idx+1}</div>
+                  )}
+                  <div className="flex-1 bg-[#080d12] rounded-lg px-3 py-2 border border-[#1e2d3d]">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-semibold text-gray-200">
+                        {fmtN(s.totalVpNow||s.vp)} VP
+                        {s.bonus>0&&<span className="text-[10px] text-green-400 ml-1">(+{s.bonus})</span>}
+                        {isRdc&&s.cashback&&<span className="text-[10px] text-gray-600 ml-1">({(s.cashback*100).toFixed(0)}% CB)</span>}
+                      </span>
+                      <span className="text-sm font-bold text-white flex gap-1.5 items-center">
+                         {couponPct>0 && s.originalPrice>s.paid && <span className="line-through text-gray-600 text-xs font-normal">{fmt(s.originalPrice)}</span>}
+                         {fmt(s.paid)}
+                      </span>
+                    </div>
+                    {applyCb&&(
+                      <div className="text-[11px] mt-0.5 space-y-0.5">
+                        {s.discountUsed>0.005&&<p className="text-green-400">↳ Usou {fmt(s.discountUsed)} de saldo</p>}
+                        <p className="text-gray-600">↳ Gera {fmt(s.cashbackEarned)} p/ próximo</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {applyCb&&result.finalCashback>0.005&&(
+              <div className="mt-2 p-2 rounded-lg text-xs flex items-center gap-1.5"
+                   style={{background:'#ff465512',border:'1px solid #ff455530',color:'#ff8a93'}}>
+                <Ico.Coin/> Sobra {fmt(result.finalCashback)} de saldo!
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    /* ═══ CARD ORÇAMENTO ══════════════════════════════════════ */
+    function BudgetCard({siteKey,result,isWinner,budget,couponPct}){
+      const site=SITES[siteKey];
+      if(!result)return(
+        <div className="card p-5 text-center">
+          <div className="site-pill mb-2" style={{background:site.color+'22',color:site.color,border:`1px solid ${site.color}44`}}>{site.tag}</div>
+          <p className="text-gray-600 text-sm mt-2">Nenhum pacote neste orçamento</p>
+        </div>
+      );
+      const leftover=budget-result.totalCost;
+      return(
+        <div className={`card p-5 relative fade-in ${isWinner?'card-winner-vp':''}`}>
+          {isWinner&&<div className="winner-badge" style={{background:'linear-gradient(135deg,#1bcfa0,#0e9e7a)',color:'#fff'}}>✓ Mais VP</div>}
+          <div className="flex items-center justify-between mb-3 pb-3" style={{borderBottom:'1px solid #1e2d3d'}}>
+            <div className="flex items-center gap-2">
+              <span className="site-pill" style={{background:site.color+'22',color:site.color,border:`1px solid ${site.color}44`}}>{site.tag}</span>
+              <span className="rajdhani font-bold text-white">{site.label}</span>
+            </div>
+            {site.url&&(
+              <a href={site.url} target="_blank" rel="noopener noreferrer" className="btn-open-site"
+                 style={{background:site.color+'18',color:site.color,border:`1px solid ${site.color}40`}}>
+                <Ico.External/> Abrir
+              </a>
+            )}
+          </div>
+          <div className="text-center py-2">
+            <div className="rajdhani font-black text-4xl" style={{color:site.color}}>{fmtN(result.totalVP)}</div>
+            <div className="text-xs text-gray-500 mt-0.5">VALORANT Points</div>
+            <div className="mt-2 text-sm font-bold text-white flex justify-center items-center gap-2">
+               {couponPct>0 && result.originalCost>result.totalCost && <span className="line-through text-gray-500 font-normal">{fmt(result.originalCost)}</span>}
+               {fmt(result.totalCost)}
+            </div>
+            {leftover>0.5&&<div className="text-xs text-green-500 mt-1 font-medium bg-green-500/10 inline-block px-2 py-0.5 rounded-full">Sobra {fmt(leftover)} do orçamento</div>}
+          </div>
+          {couponPct>0&&(
+            <div className="mt-2 mx-auto w-fit px-2 py-1 rounded text-[10px] flex items-center gap-1.5 font-bold"
+                 style={{background:'#1bcfa012',border:'1px solid #1bcfa030',color:'#1bcfa0'}}>
+              <Ico.Tag/> Cupom {couponPct}% aplicado
+            </div>
+          )}
+          <div className="mt-3 space-y-1">
+            {result.steps.map((s,i)=>(
+              <div key={i} className="flex justify-between items-center text-xs bg-[#080d12] px-2.5 py-1.5 rounded border border-[#1e2d3d]">
+                <span className="text-gray-300">{fmtN(s.totalVpNow||s.vp)} VP{s.bonus>0?` (+${s.bonus})`:''}</span>
+                <span className="text-gray-400 flex gap-1.5 items-center">
+                   {couponPct>0 && s.originalPrice>s.paid && <span className="line-through text-gray-600 text-[10px]">{fmt(s.originalPrice)}</span>}
+                   {fmt(s.paid)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    /* ═══ TESTADOR DE CUPOM UNIFICADO ═════════════════════════ */
+    function UnifiedCouponTester({ moduleKey, state, dispatch, knownCoupons }) {
+      const isCouponsTab = moduleKey === 'coupons';
+      const localState = state[moduleKey];
+      
+      const siteKey = isCouponsTab ? 'testSite' : 'couponSite';
+      const codeKey = isCouponsTab ? 'testCode' : 'couponCode';
+      const statusKey = isCouponsTab ? 'testResult' : 'couponStatus';
+
+      const site = localState[siteKey];
+      const code = localState[codeKey];
+      const status = localState[statusKey];
+
+      const setVal = (f, v) => dispatch({ type: moduleKey.toUpperCase(), field: f, val: v });
+
+      const handleTest = async () => {
+        if (!code.trim() || !site) { 
+          setVal(statusKey, null); 
+          if (!isCouponsTab) setVal('couponPct', 0); 
+          return; 
+        }
+
+        const couponsList = knownCoupons[site] || [];
+        const found = couponsList.find(c => c.code.toUpperCase() === code.toUpperCase());
+
+        if (!found) {
+          setVal(statusKey, { valid: false, notInBase: true, code: code.toUpperCase(), site });
+          if (!isCouponsTab) setVal('couponPct', 0);
+          return;
+        }
+
+        setVal(statusKey, { ...found, valid: null, testing: true });
+        // Simula apenas o tempo de rede para dar feedback visual de que processou
+        await new Promise(r => setTimeout(r, 400)); 
+        
+        setVal(statusKey, { ...found, valid: true });
+        if (!isCouponsTab) setVal('couponPct', found.value);
+      };
+
+      const confColor = { alta: '#22c55e', média: '#f5a623', baixa: '#8a9bb0' };
+
+      return (
+        <div className={`card ${isCouponsTab ? 'p-5' : 'p-4'}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Ico.Search/>
+            <span className="rajdhani font-bold text-base text-white uppercase tracking-wide">
+              {isCouponsTab ? 'Consultar Cupom' : 'Aplicar Cupom'}
+            </span>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <select value={site} onChange={e => { setVal(siteKey, e.target.value); setVal(statusKey, null); if(!isCouponsTab) setVal('couponPct',0); }}
+              className="bg-[#080d12] border border-[#1e2d3d] rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#ff4655]">
+              {!isCouponsTab && <option value="">Selecione o site</option>}
+              {Object.entries(SITES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <input type="text" value={code} onChange={e => { setVal(codeKey, e.target.value); setVal(statusKey, null); if(!isCouponsTab) setVal('couponPct',0); }}
+              placeholder="Código do cupom" onKeyDown={e => e.key === 'Enter' && handleTest()}
+              className="flex-1 min-w-[140px] bg-[#080d12] border border-[#1e2d3d] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#ff4655]"/>
+            <button onClick={handleTest} className="px-5 py-2 rounded-lg text-sm font-bold transition-transform active:scale-95 flex-shrink-0"
+              style={{background: 'linear-gradient(135deg,#ff4655,#c93040)', color: '#fff'}}>Verificar</button>
+          </div>
+
+          {status && (
+            <div className="mt-3 p-3 rounded-lg text-sm flex items-start gap-2 fade-in relative"
+                 style={
+                   status.testing        ? {background:'#f5a62310',border:'1px solid #f5a62330',color:'#f5a623'} :
+                   status.valid===true   ? {background:'#22c55e10',border:'1px solid #22c55e30',color:'#22c55e'} :
+                   status.valid===false  ? {background:'#ff465510',border:'1px solid #ff455530',color:'#ff8a93'} :
+                                          {background:'#f5a62310',border:'1px solid #f5a62330',color:'#f5a623'}
+                 }>
+              {status.testing ? (<svg className="spin flex-shrink-0 mt-0.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>) :
+               status.valid === true ? <div className="mt-0.5 flex-shrink-0"><Ico.Check/></div> : 
+               status.valid === false ? <div className="mt-0.5 flex-shrink-0"><Ico.X/></div> : 
+               <div className="mt-0.5 flex-shrink-0"><Ico.Info/></div>}
+              <div className="pr-4">
+                {status.testing ? (
+                  <p className="font-bold pulse">Verificando banco de dados...</p>
+                ) : status.valid === true ? (
+                  <>
+                    <p className="font-bold">{status.code} — Encontrado! ({status.value}% OFF {isCouponsTab ? '' : 'aplicado'})</p>
+                    <p className="text-xs mt-0.5 opacity-80">{status.desc}{status.method ? ` · ${status.method}` : ''} · Confiança: <span style={{color: confColor[status.confidence]}}>{status.confidence}</span></p>
+                  </>
+                ) : status.valid === false ? (
+                  <>
+                    <p className="font-bold">{status.code} — Não encontrado na base atual</p>
+                    <p className="text-xs mt-0.5 opacity-80">Pode ser um cupom não mapeado no nosso sistema. Tente testar diretamente no site do {SITES[site].label}.</p>
+                  </>
+                ) : null }
+              </div>
+              {!status.testing && !isCouponsTab && (
+                <button onClick={() => { setVal('couponPct', 0); setVal(codeKey, ''); setVal(statusKey, null); }} className="absolute right-3 top-3 opacity-50 hover:opacity-100"><Ico.X/></button>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    /* ═══ COMPONENTE COMPARTILHADO: BASE DE CUPONS ════════════ */
+    function KnownCouponsCard({state, dispatch, knownCoupons, defaultOpen = true}) {
+      const [isOpen, setIsOpen] = useState(defaultOpen);
+      const {selectedSite}=state.coupons;
+      const setQ=(f,v)=>dispatch({type:'COUPONS',field:f,val:v});
+
+      const confColor={alta:'#22c55e',média:'#f5a623',baixa:'#8a9bb0'};
+      const allCoupons=Object.entries(knownCoupons).flatMap(([site,cs])=>cs.map(c=>({...c,site})));
+      const filtered=selectedSite==='all'?allCoupons:allCoupons.filter(c=>c.site===selectedSite);
+
+      return (
+        <div className="card p-5">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2 cursor-pointer select-none group" onClick={() => setIsOpen(!isOpen)}>
+              <Ico.Sparkle/>
+              <span className="rajdhani font-bold text-base text-white uppercase tracking-wide group-hover:text-[#ff4655] transition-colors">Cupons Conhecidos</span>
+              <span className="text-gray-500 ml-1">{isOpen ? <Ico.ChevronUp/> : <Ico.ChevronDown/>}</span>
+            </div>
+            
+            {isOpen && (
+              <div className="flex gap-1 flex-wrap fade-in">
+                {[['all','Todos'],...Object.entries(SITES).map(([k,v])=>[k,v.tag])].map(([k,l])=>(
+                  <button key={k} onClick={()=>setQ('selectedSite',k)}
+                    className={`text-xs px-2.5 py-1 rounded-full font-bold transition-all rajdhani ${selectedSite===k?'tab-active':'tab-inactive'}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {isOpen && (
+            <div className="divide-y divide-[#1e2d3d] mt-4 fade-in">
+              {filtered.length===0?(
+                <p className="text-gray-600 text-sm py-4 text-center">Nenhum cupom listado no seu banco de dados atual.</p>
+              ):filtered.map((c,i)=>(
+                <div key={i} className="coupon-row py-3 px-2 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <span className="site-pill" style={{background:SITES[c.site]?.color+'18',color:SITES[c.site]?.color,border:`1px solid ${SITES[c.site]?.color}35`}}>{SITES[c.site]?.tag}</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <code className="text-sm font-bold text-white tracking-wider bg-[#080d12] px-2 py-0.5 rounded border border-[#1e2d3d] hover:border-[#ff4655] transition-colors"
+                              onClick={() => {
+                                navigator.clipboard.writeText(c.code);
+                                alert(`Cupom ${c.code} copiado!`);
+                              }}
+                              style={{cursor:'copy'}}
+                              title="Clique para copiar"
+                        >{c.code}</code>
+                        <span className="text-sm font-bold" style={{color:'#1bcfa0'}}>−{c.value}%</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">{c.desc}{c.method?` · ${c.method}`:''}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs" style={{color:confColor[c.confidence]}}>
+                    <span className="w-1.5 h-1.5 rounded-full inline-block" style={{background:confColor[c.confidence]}}/>
+                    Confiança {c.confidence}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+
+    /* ═══ ABA: CALCULAR VP ════════════════════════════════════ */
+    function TabCalculator({state,dispatch,rdcStore,useCashback,setUseCashback, knownCoupons}){
+      const {currentVP,targetVP,useTicket,couponSite,couponPct}=state.calc;
+      const setC=(f,v)=>dispatch({type:'CALC',field:f,val:v});
+
+      const results=useMemo(()=>{
+        const curr=parseInt(currentVP)||0,targ=parseInt(targetVP)||0;
+        if(targ<=0||curr>=targ)return null;
+        let missing=targ-curr;
+        if(useTicket)missing=Math.max(0,missing-50);
+        if(missing<=0)return null;
+        const allStores={official:OFFICIAL_STORE,nuuvem:NUUVEM_STORE,rdc:rdcStore,bonoxs:BONOXS_STORE};
+        const sites={};
+        for(const[k,s]of Object.entries(allStores)){
+          if(!s||!s.length)continue;
+          const isRdc=k==='rdc';
+          sites[k]=findBestFor(s,missing,isRdc,isRdc&&useCashback,couponSite===k?couponPct:0);
+        }
+        return{missing,sites};
+      },[currentVP,targetVP,useTicket,useCashback,rdcStore,couponPct,couponSite]);
+
+      let cheapKey=null,cheapCost=Infinity;
+      if(results){for(const[k,v]of Object.entries(results.sites)){if(v&&v.totalCost<cheapCost){cheapCost=v.totalCost;cheapKey=k;}}}
+      const hasSuff=parseInt(targetVP)>0&&(parseInt(currentVP)||0)>=(parseInt(targetVP)||0);
+
+      return(
+        <div className="space-y-4">
+          <div className="card p-5 relative overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{background:'linear-gradient(to bottom,#ff4655,transparent)'}}/>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5"><Ico.Coin/> VP que eu já tenho</label>
+                <input type="number" min="0" value={currentVP} onChange={e=>setC('currentVP',e.target.value)} placeholder="Opcional. Ex: 250"
+                  className="w-full bg-[#080d12] border border-[#1e2d3d] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#ff4655] transition-all"/>
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5"><Ico.Target/> VP Alvo (Skin, Passe ou Total)</label>
+                <input type="number" min="0" value={targetVP} onChange={e=>setC('targetVP',e.target.value)} placeholder="Ex: 1000"
+                  className="w-full bg-[#080d12] border border-[#1e2d3d] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#ff4655] transition-all"/>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-4">
+              <Checkbox checked={useTicket} onChange={()=>setC('useTicket',!useTicket)} label="Descontar 50 VP (Ticket Riot)"
+                tooltip="O Ticket Riot é um benefício gratuito da Riot Games que dá 50 VP de desconto na sua próxima compra. Disponível periodicamente para contas ativas. Marque se você possui um ticket disponível na sua conta."/>
+              <Checkbox checked={useCashback} onChange={()=>setUseCashback(!useCashback)} label="Aplicar Cashback (RDC)"
+                tooltip="O Rei dos Coins devolve uma parte do valor pago em cashback para cada compra. O saldo de cashback gerado pode ser usado como desconto na próxima compra do mesmo site. O VP Optimizer encadeia as compras automaticamente para maximizar esse benefício."/>
+            </div>
+          </div>
+
+          <UnifiedCouponTester moduleKey="calc" state={state} dispatch={dispatch} knownCoupons={knownCoupons} />
+
+          <KnownCouponsCard state={state} dispatch={dispatch} knownCoupons={knownCoupons} defaultOpen={false} />
+
+          {hasSuff?(
+            <div className="card p-6 text-center" style={{borderColor:'#22c55e40'}}>
+              <p className="rajdhani font-bold text-xl text-green-400">Você já tem VP suficiente! 🎉</p>
+            </div>
+          ):results?(
+            <div className="fade-in space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-gray-400 text-sm">Você precisa de <strong className="text-white rajdhani text-base">{fmtN(results.missing)} VP</strong></span>
+                {cheapKey&&results.sites[cheapKey]&&(
+                  <span className="text-xs font-semibold px-3 py-1.5 rounded-full"
+                        style={{background:'#22c55e12',border:'1px solid #22c55e25',color:'#22c55e'}}>
+                    Melhor: {SITES[cheapKey].label} · {fmt(results.sites[cheapKey].totalCost)}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {['official','nuuvem','rdc','bonoxs'].map(k=>(
+                  <SiteResultCard key={k} siteKey={k} result={results.sites[k]}
+                    isWinner={k===cheapKey} useCashback={useCashback} couponPct={couponSite===k?couponPct:0}/>
+                ))}
+              </div>
+            </div>
+          ):null}
+        </div>
+      );
+    }
+
+    /* ═══ ABA: ORÇAMENTO ══════════════════════════════════════ */
+    function TabBudget({state,dispatch,rdcStore,useCashback, knownCoupons}){
+      const {budget,couponSite,couponPct}=state.budget;
+      const setB=(f,v)=>dispatch({type:'BUDGET',field:f,val:v});
+      const MAX=400,STEP=5;
+
+      const results=useMemo(()=>{
+        const allStores={official:OFFICIAL_STORE,nuuvem:NUUVEM_STORE,rdc:rdcStore,bonoxs:BONOXS_STORE};
+        const out={};
+        for(const[k,s]of Object.entries(allStores)){
+          if(!s||!s.length)continue;
+          const isRdc=k==='rdc';
+          out[k]=findMaxVPFor(s,budget,isRdc,isRdc&&useCashback,couponSite===k?couponPct:0);
+        }
+        return out;
+      },[budget,rdcStore,useCashback,couponPct,couponSite]);
+
+      let bestKey=null,bestVP=0;
+      for(const[k,v]of Object.entries(results)){if(v&&v.totalVP>bestVP){bestVP=v.totalVP;bestKey=k;}}
+      const sliderPct=(budget/MAX)*100;
+
+      return(
+        <div className="space-y-4">
+          <div className="card p-5 shine relative">
+            <div className="shine-inner"/>
+            <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{background:'linear-gradient(to bottom,#1bcfa0,transparent)'}}/>
+            <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1">Modo Orçamento</p>
+            <p className="text-gray-500 text-xs mb-5">Selecione o valor que você quer gastar e o VP Optimizer encontrará o máximo de VP possível por ele em cada loja.</p>
+            
+            <div className="flex items-end gap-1 mb-3">
+              <span className="rajdhani font-black text-3xl text-gray-400">R$</span>
+              <input type="number" min="0" step="1" value={budget}
+                onChange={e=>setB('budget',Number(e.target.value))}
+                className="rajdhani font-black text-5xl text-white bg-transparent border-b-2 border-transparent hover:border-[#1e2d3d] focus:border-[#1bcfa0] focus:outline-none w-40 transition-colors"
+                style={{textShadow:'0 0 20px rgba(27,207,160,0.3)'}} />
+            </div>
+            
+            <div className="relative">
+              <div className="absolute top-1/2 -translate-y-1/2 left-0 h-1.5 rounded-full pointer-events-none"
+                   style={{width:`${sliderPct}%`,background:'linear-gradient(90deg,#ff4655,#c93040)',transition:'width 0.08s'}}/>
+              <input type="range" min={STEP} max={MAX} step={STEP} value={budget}
+                onChange={e=>setB('budget',Number(e.target.value))} style={{background:'transparent'}}/>
+            </div>
+            <div className="flex justify-between mt-1.5">
+              {[16,32,64,113,160,320].map(v=>(
+                <button key={v} onClick={()=>setB('budget',v)}
+                  className="text-[10px] px-1 font-medium rounded transition-colors"
+                  style={{color:budget===v?'#ff4655':'#3a5068',background:budget===v?'#ff465512':'transparent'}}>
+                  R${v}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <UnifiedCouponTester moduleKey="budget" state={state} dispatch={dispatch} knownCoupons={knownCoupons} />
+
+          <KnownCouponsCard state={state} dispatch={dispatch} knownCoupons={knownCoupons} defaultOpen={false} />
+
+          <div className="fade-in">
+            {bestKey&&(
+              <div className="flex items-center gap-2 mb-2 px-1 text-sm text-gray-400">
+                <Ico.Sparkle/>
+                Melhor: <strong className="text-white rajdhani">{fmtN(bestVP)} VP</strong> na <strong style={{color:SITES[bestKey].color}}>{SITES[bestKey].label}</strong>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {['official','nuuvem','rdc','bonoxs'].map(k=>(
+                <BudgetCard key={k} siteKey={k} result={results[k]} isWinner={k===bestKey} budget={budget} couponPct={couponSite===k?couponPct:0}/>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function TabCoupons({state,dispatch, knownCoupons}){
+      return(
+        <div className="space-y-4">
+          <UnifiedCouponTester moduleKey="coupons" state={state} dispatch={dispatch} knownCoupons={knownCoupons} />
+          
+          {/* Aqui já vem aberto por padrão */}
+          <KnownCouponsCard state={state} dispatch={dispatch} knownCoupons={knownCoupons} defaultOpen={true} />
+          
+          {/* Onde achar */}
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-3"><Ico.Sparkle/><span className="rajdhani font-bold text-base text-white uppercase tracking-wide">Onde achar cupons?</span></div>
+            <div className="space-y-2 text-sm text-gray-400">
+              {[
+                {icon:'🎮',txt:'Streamers e criadores de Valorant no YouTube e Twitch (o código costuma ser o nome deles)'},
+                {icon:'📱',txt:'Instagram e TikTok de influencers BR de games'},
+                {icon:'💬',txt:'Servidores Discord da Nuuvem e do Rei dos Coins'},
+                {icon:'📧',txt:'Newsletter e e-mails promocionais dos sites'},
+                {icon:'🔥',txt:'Pelando.com.br — comunidade de cupons e promoções'},
+                {icon:'🗓️',txt:'Black Friday, volta às aulas e datas comemorativas'},
+              ].map((item,i)=>(
+                <div key={i} className="flex items-start gap-2"><span>{item.icon}</span><span>{item.txt}</span></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ═══ CALCULADORA FLUTUANTE ═══════════════════════════════ */
+    function FloatingCalculator({ onClose }) {
+      const [pos, setPos] = useState(() => ({
+        x: window.innerWidth > 600 ? window.innerWidth - 280 : 20,
+        y: 80
+      }));
+      const [dragging, setDragging] = useState(false);
+      const [rel, setRel] = useState({ x: 0, y: 0 });
+
+      const [display, setDisplay] = useState('0');
+      const [prev, setPrev] = useState(null);
+      const [op, setOp] = useState(null);
+      const [waiting, setWaiting] = useState(false);
+
+      const onMouseDown = (e) => {
+        if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+        setDragging(true);
+        setRel({ x: e.clientX - pos.x, y: e.clientY - pos.y });
+      };
+
+      useEffect(() => {
+        const onMouseMove = (e) => {
+          if (!dragging) return;
+          setPos({ x: e.clientX - rel.x, y: e.clientY - rel.y });
+        };
+        const onMouseUp = () => setDragging(false);
+        if (dragging) {
+          window.addEventListener('mousemove', onMouseMove);
+          window.addEventListener('mouseup', onMouseUp);
+        }
+        return () => {
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        };
+      }, [dragging, rel]);
+
+      const inputNum = (n) => {
+        if (waiting) { setDisplay(String(n)); setWaiting(false); }
+        else { setDisplay(display === '0' ? String(n) : display + n); }
+      };
+      const inputDot = () => {
+        if (waiting) { setDisplay('0.'); setWaiting(false); }
+        else if (!display.includes('.')) { setDisplay(display + '.'); }
+      };
+      const clear = () => { setDisplay('0'); setPrev(null); setOp(null); setWaiting(false); };
+      const percent = () => setDisplay(String(parseFloat(display) / 100));
+      
+      const calculate = (a, b, op) => {
+        if(op === '+') return a + b;
+        if(op === '-') return a - b;
+        if(op === '*') return a * b;
+        if(op === '/') return a / b;
+        return b;
+      };
+
+      const performOp = (nextOp) => {
+        const val = parseFloat(display);
+        if (prev == null) { setPrev(val); }
+        else if (op && !waiting) {
+          const res = calculate(prev, val, op);
+          setDisplay(String(res));
+          setPrev(res);
+        }
+        setWaiting(true);
+        setOp(nextOp);
+      };
+
+      const equals = () => {
+        if (!op || prev == null) return;
+        const res = calculate(prev, parseFloat(display), op);
+        setDisplay(String(res));
+        setPrev(null);
+        setOp(null);
+        setWaiting(true);
+      };
+
+      const Btn = ({onClick, children, cls='', colSpan=1, rowSpan=1}) => (
+        <button onClick={onClick} className={`bg-[#1e2d3d] hover:bg-[#2a3d4f] rounded text-white font-bold text-sm py-3 transition-colors ${cls}`} 
+          style={{ gridColumn: colSpan > 1 ? `span ${colSpan}` : undefined, gridRow: rowSpan > 1 ? `span ${rowSpan}` : undefined }}>
+          {children}
+        </button>
+      );
+
+      return (
+        <div style={{ left: pos.x, top: pos.y, position: 'fixed', zIndex: 99999 }} className="card p-3 shadow-2xl w-56 flex flex-col gap-2">
+           <div onMouseDown={onMouseDown} className="flex justify-between items-center cursor-move pb-2 border-b border-[#1e2d3d]">
+             <span className="text-[10px] tracking-widest font-bold text-gray-500 select-none pointer-events-none">CALCULADORA</span>
+             <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors"><Ico.X /></button>
+           </div>
+           <div className="bg-[#080d12] rounded p-2 text-right text-2xl text-white rajdhani font-bold overflow-hidden border border-[#1e2d3d]">
+             {display}
+           </div>
+           <div className="grid grid-cols-4 gap-1.5 mt-1">
+             <Btn onClick={clear} cls="text-[#ff4655]">C</Btn>
+             <Btn onClick={percent}>%</Btn>
+             <Btn onClick={()=>performOp('/')}>/</Btn>
+             <Btn onClick={()=>performOp('*')}>×</Btn>
+
+             <Btn onClick={()=>inputNum(7)}>7</Btn>
+             <Btn onClick={()=>inputNum(8)}>8</Btn>
+             <Btn onClick={()=>inputNum(9)}>9</Btn>
+             <Btn onClick={()=>performOp('-')}>-</Btn>
+
+             <Btn onClick={()=>inputNum(4)}>4</Btn>
+             <Btn onClick={()=>inputNum(5)}>5</Btn>
+             <Btn onClick={()=>inputNum(6)}>6</Btn>
+             <Btn onClick={()=>performOp('+')}>+</Btn>
+
+             <Btn onClick={()=>inputNum(1)}>1</Btn>
+             <Btn onClick={()=>inputNum(2)}>2</Btn>
+             <Btn onClick={()=>inputNum(3)}>3</Btn>
+             <Btn onClick={equals} rowSpan={2} cls="bg-[#ff4655] hover:bg-[#c93040] text-white">=</Btn>
+
+             <Btn onClick={()=>inputNum(0)} colSpan={2}>0</Btn>
+             <Btn onClick={inputDot}>.</Btn>
+           </div>
+        </div>
+      );
+    }
+
+    /* ═══ REDUCER GLOBAL ══════════════════════════════════════ */
+    const initState={
+      calc:   { currentVP:'', targetVP:'', useTicket:false, couponSite:'', couponCode:'', couponPct:0, couponStatus:null },
+      budget: { budget:50, couponSite:'', couponCode:'', couponPct:0, couponStatus:null },
+      coupons:{ selectedSite:'all', testCode:'', testSite:'nuuvem', testResult:null },
+    };
+    function reducer(state,action){
+      switch(action.type){
+        case 'CALC':    return{...state,calc:{...state.calc,[action.field]:action.val}};
+        case 'BUDGET':  return{...state,budget:{...state.budget,[action.field]:action.val}};
+        case 'COUPONS': return{...state,coupons:{...state.coupons,[action.field]:action.val}};
+        default: return state;
+      }
+    }
+
+    /* ═══ APP PRINCIPAL ═══════════════════════════════════════ */
+    function App(){
+      const [state,dispatch]=useReducer(reducer,initState);
+      const [tab,setTab]=useState('calc');
+      const [rdcStore,setRdcStore]=useState([]);
+      const [isLoading,setIsLoading]=useState(true);
+      const [dataSource,setDataSource]=useState('live');
+      const [fetchKey,setFetchKey]=useState(0);
+      const [useCashback,setUseCashback]=useState(true);
+      const [showCalc,setShowCalc]=useState(false);
+
+      const [knownCoupons, setKnownCoupons] = useState({ nuuvem: [], rdc: [], official: [], bonoxs: [] });
+
+      const URL_JSON_CUPONS = 'https://raw.githubusercontent.com/brad38/VP-Optimizer/refs/heads/main/cupons.json'; 
+
+      useEffect(()=>{
+        (async()=>{
+          setIsLoading(true);
+          
+          try {
+            const {data,source}=await fetchRdc();
+            setRdcStore(data); 
+            setDataSource(source); 
+            
+            // 2. Busca a sua base de cupons no GitHub
+            if (URL_JSON_CUPONS !== 'INSIRA_SEU_LINK_AQUI') {
+              const res = await fetch(URL_JSON_CUPONS);
+              if (res.ok) {
+                const jsonCupons = await res.json();
+                setKnownCoupons(jsonCupons);
+              }
+            }
+          } catch(e) {
+            console.error("Erro no carregamento de dados externos: ", e);
+          } finally {
+            setIsLoading(false);
+          }
+        })();
+      },[fetchKey]);
+
+      const TABS=[{key:'calc',label:'Calcular VP'},{key:'budget',label:'Orçamento'},{key:'coupons',label:'Cupons'}];
+
+      return(
+        <div className="min-h-screen px-4 py-8 md:px-8 selection:bg-red-500/30">
+          
+          {showCalc && <FloatingCalculator onClose={() => setShowCalc(false)} />}
+
+          <div className="max-w-7xl mx-auto space-y-5">
+
+            <header className="text-center mb-4">
+              <div className="inline-flex items-center justify-center p-3 mb-2"
+                   style={{background:'#ff465510',borderRadius:999,border:'1px solid #ff455528'}}>
+                <span className="text-[#ff4655]"><Ico.Trophy/></span>
+              </div>
+              <h1 className="rajdhani font-black text-5xl md:text-6xl tracking-tight text-white glow-red">
+                VP <span className="text-[#ff4655]">OPTIMIZER</span>
+              </h1>
+              <p className="text-gray-600 text-sm mt-1">Calcule a rota mais barata para seus Valorant Points</p>
+            </header>
+
+            {/* Status + Refresh + Calc */}
+            <div className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg flex-wrap gap-2 ${
+              isLoading?'bg-[#0f1923] border border-[#1e2d3d] text-gray-500':
+              dataSource==='live'  ?'bg-green-500/8 border border-green-500/20 text-green-400':
+              dataSource==='cache' ?'bg-blue-500/8 border border-blue-500/20 text-blue-400':
+                                    'bg-yellow-500/8 border border-yellow-500/20 text-yellow-400'
+            }`}>
+              {isLoading?(
+                <span className="flex items-center gap-2 pulse">
+                  <svg className="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  Sincronizando dados...
+                </span>
+              ):(
+                <span>{dataSource==='live'?'✓ Preços do Rei dos Coins carregados ao vivo':dataSource==='cache'?'↺ Usando preços salvos do Rei dos Coins (último acesso bem-sucedido)':'⚠ Usando preços de fallback padrão para o Rei dos Coins'}</span>
+              )}
+              <div className="flex gap-2 ml-auto">
+                <button onClick={()=>setShowCalc(!showCalc)} className="flex items-center gap-1 px-2.5 py-1 rounded-full font-bold transition-all hover:opacity-80"
+                  style={{background:showCalc?'#ff465515':'#1e2d3d',border:`1px solid ${showCalc?'#ff465540':'#2a3d4f'}`,color:showCalc?'#ff4655':'#8a9bb0'}}>
+                  <Ico.Calculator/> Calculadora
+                </button>
+                <button onClick={()=>setFetchKey(n=>n+1)} disabled={isLoading}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full font-bold transition-all disabled:opacity-40 hover:opacity-80"
+                  style={{background:'#1e2d3d',border:'1px solid #2a3d4f',color:'#8a9bb0'}}>
+                  <Ico.Refresh/> Atualizar dados
+                </button>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1.5 p-1 rounded-xl" style={{background:'#0a1219',border:'1px solid #1e2d3d'}}>
+              {TABS.map(t=>(
+                <button key={t.key} onClick={()=>setTab(t.key)}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all rajdhani tracking-wide uppercase ${tab===t.key?'tab-active':'tab-inactive'}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Conteúdo — todas as abas sempre montadas, visibilidade via CSS → estado preservado */}
+            {isLoading?(
+              <div className="card p-12 flex flex-col items-center gap-4">
+                <svg className="spin h-8 w-8 text-[#ff4655]" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                </svg>
+                <span className="text-gray-500 text-sm pulse">Sincronizando preços e banco de cupons...</span>
+              </div>
+            ):(
+              <>
+                <div style={{display:tab==='calc'   ?'block':'none'}}>
+                  <TabCalculator state={state} dispatch={dispatch} rdcStore={rdcStore} useCashback={useCashback} setUseCashback={setUseCashback} knownCoupons={knownCoupons} />
+                </div>
+                <div style={{display:tab==='budget' ?'block':'none'}}>
+                  <TabBudget    state={state} dispatch={dispatch} rdcStore={rdcStore} useCashback={useCashback} knownCoupons={knownCoupons} />
+                </div>
+                <div style={{display:tab==='coupons'?'block':'none'}}>
+                  <TabCoupons   state={state} dispatch={dispatch} knownCoupons={knownCoupons}/>
+                </div>
+              </>
+            )}
+
+            <footer className="text-center text-xs text-gray-700 pb-4">
+              VP Optimizer · Não afiliado à Riot Games, Nuuvem, Rei dos Coins ou Bonoxs · Preços sujeitos a alteração
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
