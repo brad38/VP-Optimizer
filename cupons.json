@@ -48,6 +48,13 @@
       "value": 5,
       "confidence": "média",
       "method": null
+    },
+    {
+      "code": "PROMO",
+      "desc": "Cupom capturado do Pelando",
+      "value": 5,
+      "confidence": "média",
+      "method": "pelando-scraper"
     }
   ],
   "rdc": [
