@@ -127,11 +127,22 @@
       { vp:4745, price:170.00 }, { vp:9185, price:320.00 },
     ];
 
+    // Aurora Gamer: valores à vista no Pix. Cashback atual: 1% para a próxima compra.
+    const FALLBACK_AURORA = [
+      { vp:400,  price:14.88, cashback:0.01, pix:true },
+      { vp:815,  price:29.76, cashback:0.01, pix:true },
+      { vp:1700, price:59.52, cashback:0.01, pix:true },
+      { vp:3085, price:105.09, cashback:0.01, pix:true },
+      { vp:4450, price:148.80, cashback:0.01, pix:true },
+      { vp:9185, price:297.60, cashback:0.01, pix:true },
+    ];
+
     const SITES = {
       official: { label:'Loja Oficial',  color:'#4fa3e0', tag:'RIOT',   url:null,                                               store:OFFICIAL_STORE },
       nuuvem:   { label:'Nuuvem',        color:'#1bcfa0', tag:'NUUVEM', url:'https://www.nuuvem.com/lp/pt/valorant-points/',    store:NUUVEM_STORE   },
       rdc:      { label:'Rei dos Coins', color:'#f5a623', tag:'RDC',    url:'https://www.reidoscoins.com.br/Valorant',          store:null           },
       bonoxs:   { label:'Bonoxs',        color:'#a855f7', tag:'BONOXS', url:'https://bonoxs.com/br?from=header',                store:BONOXS_STORE   },
+      aurora:   { label:'Aurora Gamer',  color:'#e879f9', tag:'AURORA', url:'https://auroragamer.com.br/category/valorant',       store:null, pixOnly:true, cashback:0.01 },
     };
 
     /* ═══ FETCH RDC ═══════════════════════════════════════════ */
@@ -184,6 +195,76 @@
       return{data:FALLBACK_RDC,source:'fallback'};
     }
 
+
+    /* ═══ FETCH AURORA GAMER ══════════════════════════════════ */
+    const AURORA_URL = 'https://auroragamer.com.br/category/valorant';
+    const AURORA_CACHE_KEY = 'vp_optimizer_aurora_cache';
+
+    const parseAuroraHtml = (html) => {
+      const text = new DOMParser().parseFromString(html,'text/html').body.textContent || '';
+      // Ex.: Valorant - 1700 VP ... R$ 64,00 ... R$ 59,52 ... à vista no Pix
+      const re = /Valorant\s*-\s*(\d[\d.]*)\s*VP[\s\S]{0,260}?R\$\s*(\d+(?:[.,]\d{2})?)[\s\S]{0,140}?R\$\s*(\d+(?:[.,]\d{2})?)[\s\S]{0,100}?(?:à|a)\s+vista\s+no\s+Pix/gi;
+      const map = new Map();
+      for (const m of text.matchAll(re)) {
+        const vp = parseInt(m[1].replace(/\./g,''));
+        const regularPrice = parseFloat(m[2].replace(/\./g,'').replace(',','.'));
+        const pixPrice = parseFloat(m[3].replace(/\./g,'').replace(',','.'));
+        if(vp>0 && pixPrice>0){
+          map.set(vp,{vp,price:pixPrice,regularPrice,cashback:0.01,pix:true});
+        }
+      }
+      return [...map.values()].sort((a,b)=>a.vp-b.vp);
+    };
+
+    function loadCachedAurora(){
+      try{
+        const raw=localStorage.getItem(AURORA_CACHE_KEY);
+        if(!raw) return null;
+        const {data}=JSON.parse(raw);
+        if(Array.isArray(data)&&data.length>0) return data;
+      }catch(e){}
+      return null;
+    }
+    function saveCachedAurora(data){
+      try{ localStorage.setItem(AURORA_CACHE_KEY,JSON.stringify({data,ts:Date.now()})); }catch(e){}
+    }
+
+    async function fetchAuroraCashbackRate(){
+      const verifyUrl='https://auroragamer.com.br/package/valorant-1700-vp';
+      for(let i=0;i<CORS_PROXIES.length;i++){
+        try{
+          const r=await fetch(CORS_PROXIES[i](verifyUrl),{signal:AbortSignal.timeout(8000)});
+          if(!r.ok) continue;
+          const html=i===0?(await r.json()).contents:await r.text();
+          const text=new DOMParser().parseFromString(html||'','text/html').body.textContent||'';
+          const m=text.match(/([\d]+(?:[.,]\d+)?)\s*%\s*de\s*volta\s*para\s*usar\s*na\s*pr[oó]xima/i);
+          if(m) return parseFloat(m[1].replace(',','.'))/100;
+        }catch(e){ console.warn(`Aurora cashback proxy ${i}:`,e.message); }
+      }
+      return 0.01;
+    }
+
+    async function fetchAurora() {
+      for (let i=0;i<CORS_PROXIES.length;i++) {
+        try {
+          const r=await fetch(CORS_PROXIES[i](AURORA_URL),{signal:AbortSignal.timeout(8000)});
+          if(!r.ok) continue;
+          const html=i===0?(await r.json()).contents:await r.text();
+          if(!html) continue;
+          const parsed=parseAuroraHtml(html);
+          if(parsed.length>0){
+            const cashback=await fetchAuroraCashbackRate();
+            const verified=parsed.map(item=>({...item,cashback}));
+            saveCachedAurora(verified);
+            return{data:verified,source:'live',cashback};
+          }
+        } catch(e) { console.warn(`Aurora proxy ${i}:`,e.message); }
+      }
+      const cached=loadCachedAurora();
+      if(cached) return{data:cached,source:'cache',cashback:cached[0]?.cashback||0.01};
+      return{data:FALLBACK_AURORA,source:'fallback',cashback:0.01};
+    }
+
     /* ═══ HELPERS ═════════════════════════════════════════════ */
     const fmt  = (v) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);
     const fmtN = (v) => new Intl.NumberFormat('pt-BR').format(v);
@@ -197,7 +278,7 @@
       };
       h([],0); return res;
     }
-    function evalCombo(combo,isRdc,applyCb,cpPct=0){
+    function evalCombo(combo,applyCb,cpPct=0){
       const sorted=[...combo].sort((a,b)=>b.price-a.price);
       let cost=0, originalTotalCost=0, cb=0, steps=[],totalVP=0;
 
@@ -205,7 +286,7 @@
         const tvp=item.vp+(item.bonus||0); totalVP+=tvp;
         originalTotalCost += item.price;
 
-        if(isRdc&&applyCb){
+        if(applyCb){
           const paid=Math.max(0,item.price-cb)*(1-cpPct/100);
           const earned=paid*(item.cashback||0);
           cost+=paid;
@@ -220,20 +301,20 @@
       }
       return{items:sorted,totalVP,totalCost:cost,originalCost:originalTotalCost,steps,finalCashback:cb};
     }
-    function findBestFor(store,need,isRdc=false,applyCb=false,cpPct=0){
+    function findBestFor(store,need,applyCb=false,cpPct=0){
       if(!store||!store.length)return null;
       let best=null;
       for(const c of getCombos(store,4)){
-        const ev=evalCombo(c,isRdc,applyCb,cpPct);
+        const ev=evalCombo(c,applyCb,cpPct);
         if(ev.totalVP>=need&&(!best||ev.totalCost<best.totalCost||(ev.totalCost===best.totalCost&&ev.totalVP>best.totalVP)))best=ev;
       }
       return best;
     }
-    function findMaxVPFor(store,budget,isRdc=false,applyCb=false,cpPct=0){
+    function findMaxVPFor(store,budget,applyCb=false,cpPct=0){
       if(!store||!store.length)return null;
       let best=null;
       for(const c of getCombos(store,4)){
-        const ev=evalCombo(c,isRdc,applyCb,cpPct);
+        const ev=evalCombo(c,applyCb,cpPct);
         if(ev.totalCost<=budget+0.001&&(!best||ev.totalVP>best.totalVP||(ev.totalVP===best.totalVP&&ev.totalCost<best.totalCost)))best=ev;
       }
       return best;
@@ -311,7 +392,8 @@
     function SiteResultCard({siteKey,result,isWinner,useCashback,couponPct}){
       const site=SITES[siteKey];
       const isRdc=siteKey==='rdc';
-      const applyCb=isRdc&&useCashback;
+      const isAurora=siteKey==='aurora';
+      const applyCb=(isRdc||isAurora)&&useCashback;
       if(!result)return(
         <div className="card p-5 text-center">
           <div className="site-pill mb-2" style={{background:site.color+'22',color:site.color,border:`1px solid ${site.color}44`}}>{site.tag}</div>
@@ -350,6 +432,13 @@
               <Ico.Tag/> Cupom {couponPct}% aplicado
             </div>
           )}
+          {site.pixOnly&&(
+            <div className="mb-3 p-2 rounded-lg text-xs space-y-0.5"
+                 style={{background:'#e879f912',border:'1px solid #e879f930',color:'#f0abfc'}}>
+              <p className="font-bold">Preço calculado à vista no Pix</p>
+              <p className="opacity-75">Aurora Gamer: 1% de cashback em crédito para usar na próxima compra.</p>
+            </div>
+          )}
           <div className="space-y-2">
             <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
               {applyCb?'Passo a passo (com cashback)':'Pacotes a comprar'}
@@ -367,7 +456,7 @@
                       <span className="text-sm font-semibold text-gray-200">
                         {fmtN(s.totalVpNow||s.vp)} VP
                         {s.bonus>0&&<span className="text-[10px] text-green-400 ml-1">(+{s.bonus})</span>}
-                        {isRdc&&s.cashback&&<span className="text-[10px] text-gray-600 ml-1">({(s.cashback*100).toFixed(0)}% CB)</span>}
+                        {s.cashback>0&&<span className="text-[10px] text-gray-600 ml-1">({(s.cashback*100).toFixed(0)}% CB)</span>}
                       </span>
                       <span className="text-sm font-bold text-white flex gap-1.5 items-center">
                          {couponPct>0 && s.originalPrice>s.paid && <span className="line-through text-gray-600 text-xs font-normal">{fmt(s.originalPrice)}</span>}
@@ -433,6 +522,12 @@
             <div className="mt-2 mx-auto w-fit px-2 py-1 rounded text-[10px] flex items-center gap-1.5 font-bold"
                  style={{background:'#1bcfa012',border:'1px solid #1bcfa030',color:'#1bcfa0'}}>
               <Ico.Tag/> Cupom {couponPct}% aplicado
+            </div>
+          )}
+          {site.pixOnly&&(
+            <div className="mt-2 mx-auto w-fit px-2 py-1 rounded text-[10px] font-bold text-center"
+                 style={{background:'#e879f912',border:'1px solid #e879f930',color:'#f0abfc'}}>
+              Preço à vista no Pix — 1% de cashback
             </div>
           )}
           <div className="mt-3 space-y-1">
@@ -673,7 +768,7 @@
 
 
     /* ═══ ABA: CALCULAR VP ════════════════════════════════════ */
-    function TabCalculator({state,dispatch,rdcStore,useCashback,setUseCashback,knownCoupons}){
+    function TabCalculator({state,dispatch,rdcStore,auroraStore,useCashback,setUseCashback,knownCoupons}){
       const {currentVP,targetVP,useTicket,couponSite,couponPct}=state.calc;
       const setC=(f,v)=>dispatch({type:'CALC',field:f,val:v});
 
@@ -683,15 +778,15 @@
         let missing=targ-curr;
         if(useTicket)missing=Math.max(0,missing-50);
         if(missing<=0)return null;
-        const allStores={official:OFFICIAL_STORE,nuuvem:NUUVEM_STORE,rdc:rdcStore,bonoxs:BONOXS_STORE};
+        const allStores={official:OFFICIAL_STORE,nuuvem:NUUVEM_STORE,rdc:rdcStore,bonoxs:BONOXS_STORE,aurora:auroraStore};
         const sites={};
         for(const[k,s]of Object.entries(allStores)){
           if(!s||!s.length)continue;
-          const isRdc=k==='rdc';
-          sites[k]=findBestFor(s,missing,isRdc,isRdc&&useCashback,couponSite===k?couponPct:0);
+          const supportsCashback=k==='rdc'||k==='aurora';
+          sites[k]=findBestFor(s,missing,supportsCashback&&useCashback,couponSite===k?couponPct:0);
         }
         return{missing,sites};
-      },[currentVP,targetVP,useTicket,useCashback,rdcStore,couponPct,couponSite]);
+      },[currentVP,targetVP,useTicket,useCashback,rdcStore,auroraStore,couponPct,couponSite]);
 
       let cheapKey=null,cheapCost=Infinity;
       if(results){for(const[k,v]of Object.entries(results.sites)){if(v&&v.totalCost<cheapCost){cheapCost=v.totalCost;cheapKey=k;}}}
@@ -716,8 +811,8 @@
             <div className="mt-4 flex flex-wrap gap-4">
               <Checkbox checked={useTicket} onChange={()=>setC('useTicket',!useTicket)} label="Descontar 50 VP (Ticket Riot)"
                 tooltip="O Ticket Riot é um benefício gratuito da Riot Games que dá 50 VP de desconto na sua próxima compra. Disponível periodicamente para contas ativas. Marque se você possui um ticket disponível na sua conta."/>
-              <Checkbox checked={useCashback} onChange={()=>setUseCashback(!useCashback)} label="Aplicar Cashback (RDC)"
-                tooltip="O Rei dos Coins devolve uma parte do valor pago em cashback para cada compra. O saldo de cashback gerado pode ser usado como desconto na próxima compra do mesmo site. O VP Optimizer encadeia as compras automaticamente para maximizar esse benefício."/>
+              <Checkbox checked={useCashback} onChange={()=>setUseCashback(!useCashback)} label="Aplicar Cashback (RDC e Aurora)"
+                tooltip="O Rei dos Coins e a Aurora Gamer devolvem parte do valor pago em cashback. Na Aurora, o retorno atual é de 1% em crédito para a próxima compra. O VP Optimizer encadeia as compras automaticamente quando esse benefício está ativado."/>
             </div>
           </div>
 
@@ -739,8 +834,8 @@
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {['official','nuuvem','rdc','bonoxs'].map(k=>(
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                {['official','nuuvem','rdc','bonoxs','aurora'].map(k=>(
                   <SiteResultCard key={k} siteKey={k} result={results.sites[k]}
                     isWinner={k===cheapKey} useCashback={useCashback} couponPct={couponSite===k?couponPct:0}/>
                 ))}
@@ -752,21 +847,21 @@
     }
 
     /* ═══ ABA: ORÇAMENTO ══════════════════════════════════════ */
-    function TabBudget({state,dispatch,rdcStore,useCashback,knownCoupons}){
+    function TabBudget({state,dispatch,rdcStore,auroraStore,useCashback,knownCoupons}){
       const {budget,couponSite,couponPct}=state.budget;
       const setB=(f,v)=>dispatch({type:'BUDGET',field:f,val:v});
       const MAX=400,STEP=5;
 
       const results=useMemo(()=>{
-        const allStores={official:OFFICIAL_STORE,nuuvem:NUUVEM_STORE,rdc:rdcStore,bonoxs:BONOXS_STORE};
+        const allStores={official:OFFICIAL_STORE,nuuvem:NUUVEM_STORE,rdc:rdcStore,bonoxs:BONOXS_STORE,aurora:auroraStore};
         const out={};
         for(const[k,s]of Object.entries(allStores)){
           if(!s||!s.length)continue;
-          const isRdc=k==='rdc';
-          out[k]=findMaxVPFor(s,budget,isRdc,isRdc&&useCashback,couponSite===k?couponPct:0);
+          const supportsCashback=k==='rdc'||k==='aurora';
+          out[k]=findMaxVPFor(s,budget,supportsCashback&&useCashback,couponSite===k?couponPct:0);
         }
         return out;
-      },[budget,rdcStore,useCashback,couponPct,couponSite]);
+      },[budget,rdcStore,auroraStore,useCashback,couponPct,couponSite]);
 
       let bestKey=null,bestVP=0;
       for(const[k,v]of Object.entries(results)){if(v&&v.totalVP>bestVP){bestVP=v.totalVP;bestKey=k;}}
@@ -813,8 +908,8 @@
                 Melhor: <strong className="text-white rajdhani">{fmtN(bestVP)} VP</strong> na <strong style={{color:SITES[bestKey].color}}>{SITES[bestKey].label}</strong>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {['official','nuuvem','rdc','bonoxs'].map(k=>(
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+              {['official','nuuvem','rdc','bonoxs','aurora'].map(k=>(
                 <BudgetCard key={k} siteKey={k} result={results[k]} isWinner={k===bestKey} budget={budget} couponPct={couponSite===k?couponPct:0}/>
               ))}
             </div>
@@ -936,12 +1031,14 @@
       const [state,dispatch]=useReducer(reducer,initState);
       const [tab,setTab]=useState('calc');
       const [rdcStore,setRdcStore]=useState([]);
+      const [auroraStore,setAuroraStore]=useState([]);
       const [isLoading,setIsLoading]=useState(true);
       const [dataSource,setDataSource]=useState('live');
+      const [auroraDataSource,setAuroraDataSource]=useState('live');
       const [fetchKey,setFetchKey]=useState(0);
       const [useCashback,setUseCashback]=useState(true);
       const [showCalc,setShowCalc]=useState(false);
-      const [knownCoupons, setKnownCoupons] = useState({ nuuvem: [], rdc: [], official: [], bonoxs: [] });
+      const [knownCoupons, setKnownCoupons] = useState({ nuuvem: [], rdc: [], official: [], bonoxs: [], aurora: [] });
 
       const URL_JSON_CUPONS = 'https://raw.githubusercontent.com/brad38/VP-Optimizer/refs/heads/main/cupons.json';
 
@@ -949,8 +1046,9 @@
         (async()=>{
           setIsLoading(true);
           try {
-            const {data,source}=await fetchRdc();
-            setRdcStore(data); setDataSource(source);
+            const [rdcResult,auroraResult]=await Promise.all([fetchRdc(),fetchAurora()]);
+            setRdcStore(rdcResult.data); setDataSource(rdcResult.source);
+            setAuroraStore(auroraResult.data); setAuroraDataSource(auroraResult.source);
             if (URL_JSON_CUPONS !== 'INSIRA_SEU_LINK_AQUI') {
               const res = await fetch(URL_JSON_CUPONS);
               if (res.ok) { const jsonCupons = await res.json(); setKnownCoupons(jsonCupons); }
@@ -989,7 +1087,12 @@
                   Sincronizando dados...
                 </span>
               ):(
-                <span>{dataSource==='live'?'✓ Preços do Rei dos Coins carregados ao vivo':dataSource==='cache'?'↺ Usando preços salvos do Rei dos Coins (último acesso bem-sucedido)':'⚠ Usando preços de fallback padrão para o Rei dos Coins'}</span>
+                <span>
+                  {dataSource==='live'?'✓ RDC ao vivo':dataSource==='cache'?'↺ RDC em cache':'⚠ RDC em fallback'}
+                  <span className="mx-2 text-gray-600">|</span>
+                  {auroraDataSource==='live'?'✓ Aurora ao vivo':auroraDataSource==='cache'?'↺ Aurora em cache':'⚠ Aurora em fallback'}
+                  <span className="ml-2 opacity-70">(Aurora: preço à vista no Pix, 1% de cashback)</span>
+                </span>
               )}
               <div className="flex gap-2 ml-auto">
                 <button onClick={()=>setShowCalc(!showCalc)} className="flex items-center gap-1 px-2.5 py-1 rounded-full font-bold transition-all hover:opacity-80"
@@ -1024,10 +1127,10 @@
             ):(
               <>
                 <div style={{display:tab==='calc'   ?'block':'none'}}>
-                  <TabCalculator state={state} dispatch={dispatch} rdcStore={rdcStore} useCashback={useCashback} setUseCashback={setUseCashback} knownCoupons={knownCoupons} />
+                  <TabCalculator state={state} dispatch={dispatch} rdcStore={rdcStore} auroraStore={auroraStore} useCashback={useCashback} setUseCashback={setUseCashback} knownCoupons={knownCoupons} />
                 </div>
                 <div style={{display:tab==='budget' ?'block':'none'}}>
-                  <TabBudget    state={state} dispatch={dispatch} rdcStore={rdcStore} useCashback={useCashback} knownCoupons={knownCoupons} />
+                  <TabBudget    state={state} dispatch={dispatch} rdcStore={rdcStore} auroraStore={auroraStore} useCashback={useCashback} knownCoupons={knownCoupons} />
                 </div>
                 <div style={{display:tab==='coupons'?'block':'none'}}>
                   <TabCoupons   state={state} dispatch={dispatch} knownCoupons={knownCoupons}/>
@@ -1036,7 +1139,7 @@
             )}
 
             <footer className="text-center text-xs text-gray-700 pb-4">
-              VP Optimizer · Não afiliado à Riot Games, Nuuvem, Rei dos Coins ou Bonoxs · Preços sujeitos a alteração
+              VP Optimizer — Não afiliado à Riot Games, Nuuvem, Rei dos Coins, Bonoxs ou Aurora Gamer — Preços sujeitos a alteração
             </footer>
           </div>
         </div>
